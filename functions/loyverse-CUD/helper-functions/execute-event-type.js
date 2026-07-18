@@ -168,7 +168,7 @@ async function processParentItem(ctx, item, payload) {
 	//--------------------------------------------
 
 	// upsert category
-	await upsertCategory(ctx, item);
+	if (item.category) await upsertCategory(ctx, item);
 	
 	//--------------------------------------------
 
