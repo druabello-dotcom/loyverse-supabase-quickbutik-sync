@@ -20,17 +20,6 @@ function updateAttributesObject(optionX_name, optionX_value, attributesObject) {
 //—————————————————————————————————————————————————————————————————————————————
 const LOYVERSE_API_TOKEN = Deno.env.get("LOYVERSE_API_TOKEN");
 export async function executeEventType(payload, ctx) {
-/* 	console.log({
-		type: payload.type,
-		created_at: payload.created_at,
-		items: payload.items.map(i => ({
-			id: i.id,
-			name: i.item_name,
-			updated_at: i.updated_at,
-			deleted_at: i.deleted_at
-		}))
-	}); */
-
 	if (!payload.items) {
 		console.error("ERROR missing 'items' array in payload");
 		throw new Error("ERROR missing 'items' array in payload");
