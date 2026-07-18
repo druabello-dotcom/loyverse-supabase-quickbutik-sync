@@ -46,6 +46,7 @@ export async function executeEventType(payload, ctx) {
 
 async function processParentItem(ctx, item, payload) {
 	console.log(`Webhook received for item: ${item.item_name} | updated_at: ${item.updated_at}`);
+	console.log(item);
 
 	//--------------------------------------------
 
@@ -77,6 +78,7 @@ async function processParentItem(ctx, item, payload) {
 		.from("deleted_products")
 		.upsert({
 			product_id: item.id,
+			item_name: item.item_name,
 			supplier_id: item.primary_supplier_id,
 			supplier_name: supplier.name,
 			deleted_at: item.deleted_at
@@ -174,6 +176,11 @@ async function processParentItem(ctx, item, payload) {
 		}
 	}
 
+	//--------------------------------------------
+
+	// upsert category
+	await upsertCategory(ctx, item);
+	
 	//--------------------------------------------
 
 	// upsert item
@@ -317,4 +324,49 @@ async function processVariants(ctx, variant, item, variantsArray) {
 		}))
 	}
 	variantsArray.push(currentVariantObject);
+}
+
+async function upsertCategory(ctx, item) {
+	const categoryResponse = await fetch(`https://api.loyverse.com/v1.0/categories/${item.category_id}`,{
+		method: "GET",
+		headers: {
+			"Authorization": `Bearer ${LOYVERSE_API_TOKEN}`,
+			"Content-Type": "application/json"
+		}
+	});
+	if (!categoryResponse.ok) {
+		const errorText = await categoryResponse.text()
+		console.error(`FAILED to fetch category: ${errorText}`);
+		throw new Error(`FAILED to fetch category: ${errorText}`);
+	}
+
+	const category = await categoryResponse.json();
+	const { error: categoryError } = await ctx.supabaseAdmin
+	.from("categories")
+	.upsert({
+		category_id: category.id,
+		category_name: capitalizeWords(category.name)
+	}, { onConflict: "category_id"});
+	if (categoryError) {
+		console.error(`FAILED to upsert category: '${category.name}'`);
+		throw new Error(`FAILED to upsert category: '${category.name}'`);
+	}
+
+	const { error: junctionError } = await ctx.supabaseAdmin
+	.from("product_categories")
+	.upsert({
+		product_id: item.id,
+		category_id: category.id,
+		is_primary_category: true,
+	}, { onConflict: "product_id, category_id"});
+	if (junctionError) {
+		console.error(`FAILED to upsert to junction: ${category.name}, ${item.item_name}`);
+		throw new Error(`FAILED to upsert to junction: ${category.name}, ${item.item_name}`);
+	}
+}
+
+function capitalizeWords(str) {
+	return str
+		.toLowerCase()
+		.replace(/\b\w/g, char => char.toUpperCase());
 }
