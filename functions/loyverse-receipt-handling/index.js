@@ -47,31 +47,26 @@ export default {
 
 //—————————————————————————————————————————————————————————————————————————————
 
-async function processSale(ctx, payload) {
-	if (payload.cancelled_at) {
-		await cancelSale(ctx, payload); // make this function
-		return;
-	}
-
+async function processSale(ctx, receipt) {
 	// insert the transaction
 	const { error: transaction } = await ctx.supabaseAdmin
 	.from("sale_transactions")
 	.upsert({
-		receipt_number: payload.receipt_number,
-		store_id: payload.store_id,
-		customer_id: payload.store_id,
-		employee_id: payload.employee_id,
+		receipt_number: receipt.receipt_number,
+		store_id: receipt.store_id,
+		customer_id: receipt.customer_id,
+		employee_id: receipt.employee_id,
 
-		transaction_date: payload.created_at,
+		transaction_date: receipt.created_at,
 
-		subtotal: payload.total_money + payload.total_discount - payload.total_tax,
-		discount_amount: payload.total_discount,
-		tax_amount: payload.total_tax,
-		total: payload.total_money
+		subtotal: receipt.total_money + receipt.total_discount - receipt.total_tax,
+		discount_amount: receipt.total_discount,
+		tax_amount: receipt.total_tax,
+		total: receipt.total_money
 	}, { onConflict: "store_id, receipt_number"});
 	if (transaction) {
-		console.error(`FAILED to upsert transaction '${payload.receipt_number}'`);
-		throw new Error(`FAILED to upsert transaction '${payload.receipt_number}'`);
+		console.error(`FAILED to upsert transaction '${receipt.receipt_number}'`);
+		throw new Error(`FAILED to upsert transaction '${receipt.receipt_number}'`);
 	}
 
 	//--------------------------------------------
@@ -79,15 +74,16 @@ async function processSale(ctx, payload) {
 	const { data, error } = await ctx.supabaseAdmin
 	.from("sale_transactions")
 	.select("transaction_id")
-	.eq("receipt_number", payload.receipt_number)
-	.maybeSingle();
+	.eq("store_id", receipt.store_id)
+	.eq("receipt_number", receipt.receipt_number)
+	.single();
 	if (error || !data) {
-		console.error(`FAILED to get 'transaction_id': ${error.message}`);
-		throw new Error(`FAILED to get 'transaction_id': ${error.message}`);
+		console.error(`FAILED to get 'transaction_id': ${error.message ? error.message : "NO DATA"}`);
+		throw new Error(`FAILED to get 'transaction_id': ${error.message ? error.message : "NO DATA"}`);
 	}
 	const transactionId = data.transaction_id;
 
-	for (const discount of payload.total_discounts) {
+	for (const discount of receipt.total_discounts) {
 		const { error: transactionDiscounts } = await ctx.supabaseAdmin
 		.from("transaction_discounts")
 		.upsert({
@@ -106,7 +102,7 @@ async function processSale(ctx, payload) {
 
 	//--------------------------------------------	
 	// iterate through transaction taxes
-	for (const tax of payload.total_taxes) {
+	for (const tax of receipt.total_taxes) {
 		const { error: transactionTaxes } = await ctx.supabaseAdmin
 		.from("transaction_taxes")
 		.upsert({
@@ -124,7 +120,7 @@ async function processSale(ctx, payload) {
 	}
 
 	//--------------------------------------------	
-	for (const item of payload.line_items) {
+	for (const item of receipt.line_items) {
 
 		// upsert line_item
 		const { error: saleItem } = await ctx.supabaseAdmin
