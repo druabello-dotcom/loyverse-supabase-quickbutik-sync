@@ -97,7 +97,7 @@ async function processSale(ctx, payload) {
 			name: discount.name,
 			percentage: discount.type === "VARIABLE_PERCENT" ? discount.percentage : null,
 			amount: discount.money_amount
-		}, { onConflict: "discount_id" });
+		}, { onConflict: "transaction_id,loyverse_discount_id" });
 		if (transactionDiscounts) {
 			console.error(`FAILED to upsert transaction discounts object`);
 			throw new Error(`FAILED to upsert transaction discounts object`);
@@ -116,7 +116,7 @@ async function processSale(ctx, payload) {
 			name: tax.name,
 			rate: tax.rate,
 			amount: tax.money_amount
-		}, { onConflict: "tax_id"})
+		}, { onConflict: "transaction_id,loyverse_tax_id" })
 		if (transactionTaxes) {
 			console.error(`FAILED to upsert tax: ${tax.name}`);
 			throw new Error(`FAILED to upsert tax: ${tax.name}`);
@@ -143,7 +143,7 @@ async function processSale(ctx, payload) {
 			gross_total: item.gross_total_money,
 			discount_amount: item.total_discount,
 			net_total: item.total_money
-		} { onConflict: "salte_item_id"});
+		}, { onConflict: "transaction_id,loyverse_line_item_id"});
 		if (saleItem) {
 			console.error(`FAILED to upsert sale_item: ${item.item_name}`);
 			throw new Error(`FAILED to upsert sale_item: ${item.item_name}`);
