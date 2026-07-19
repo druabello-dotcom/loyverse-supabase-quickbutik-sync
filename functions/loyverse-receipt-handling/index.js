@@ -154,37 +154,63 @@ async function processSale(ctx, payload) {
 		.from("sale_items")
 		.select("sale_item_id")
 		.eq("transaction_id", transactionId)
-		.maybeSingle();
+		.eq("loyverse_line_item_id", item.id)
+		.single();
 
 		if (error || !data) {
-			console.log(`FAILED to get 'sale_item_id: ${error.message}`);
-			throw new Error(`FAILED to get 'sale_item_id: ${error.message}`);
+			console.log(`FAILED to get 'sale_item_id: ${error.message ? error.message : "NO DATA"}`);
+			throw new Error(`FAILED to get 'sale_item_id: ${error.message ? error.message : "NO DATA"}`);
 		}
 		const saleItemId = data.sale_item_id;
 
 		for (const discount of item.line_discounts) {
+			const { data: discountData, error: discountError } = await ctx.supabaseAdmin
+			.from("transaction_discounts")
+			.select("discount_id")
+			.eq("transaction_id", transactionId)
+			.eq("loyverse_discount_id", discount.id)
+			.single();
+	
+			if (discountError || !discountData) {
+				const errorMessage = discountError?.message ?? "NO DATA";
+				console.log(`FAILED to get discount_id: ${errorMessage}`);
+				throw new Error(`FAILED to get discount_id: ${errorMessage}`);
+			}
+
 			const { error: saleItemDiscount } = await ctx.supabaseAdmin
 			.from("sale_item_discounts")
 			.upsert({
 				sale_item_id: saleItemId,
 				discount_id: discount.id,
 				amount: discount.money_amount
-			}, { onConflict: "sale_item_id, discount_id" });
+			}, { onConflict: "sale_item_id,discount_id" });
 			if (saleItemDiscount) {
 				console.error("FAILED to upsert to 'sale_item_discounts");
 				throw new Error("FAILED to upsert to 'sale_item_discounts");
 			}
 		}
 
-		//upsert the taxes
 		for (const tax of item.line_taxes) {
+			//upsert the taxes
+			const { data: taxData, error: taxError } = await ctx.supabaseAdmin
+			.from("transaction_taxes")
+			.select("tax_id")
+			.eq("transaction_id", transactionId)
+			.eq("loyverse_tax_id", tax.id)
+			.single();
+			if (taxError || !taxData) {
+				const errorMessage = taxError.message ? taxError.message : "NO DATA";
+				console.error(`FAILED to get 'transaction': ${errorMessage}`);
+				throw new Error(`FAILED to get 'transaction': ${errorMessage}`);
+			}
+
 			const { error: saleItemTax } = await ctx.supabaseAdmin
 			.from("sale_item_taxes")
 			.upsert({
 				sale_item_id: saleItemId,
-				tax_id: tax.id,
+				tax_id: taxData.tax_id,
 				amount: tax.money_amount
-			}, { onConflict: "sale_item_id, tax_id"});
+			}, { onConflict: "sale_item_id,tax_id" });
 			if (saleItemTax) {
 				console.log(`FAILED upsertion to sale_item_taxes. Amount: ${tax.money_amount}`);
 				throw new Error(`FAILED upsertion to sale_item_taxes. Amount: ${tax.money_amount}`);
