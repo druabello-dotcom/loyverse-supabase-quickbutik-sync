@@ -171,5 +171,20 @@ async function processSale(ctx, payload) {
 				throw new Error("FAILED to upsert to 'sale_item_discounts");
 			}
 		}
+
+		//upsert the taxes
+		for (const tax of item.line_taxes) {
+			const { error: saleItemTax } = await ctx.supabaseAdmin
+			.from("sale_item_taxes")
+			.upsert({
+				sale_item_id: saleItemId,
+				tax_id: tax.id,
+				amount: tax.money_amount
+			}, { onConflict: "sale_item_id, tax_id"});
+			if (saleItemTax) {
+				console.log(`FAILED upsertion to sale_item_taxes. Amount: ${tax.money_amount}`);
+				throw new Error(`FAILED upsertion to sale_item_taxes. Amount: ${tax.money_amount}`);
+			}
+		}
 	}
 }
