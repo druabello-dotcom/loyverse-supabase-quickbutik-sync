@@ -72,10 +72,16 @@ async function processSale(ctx, payload) {
 
 	//--------------------------------------------
 	// iterate through transaction discounts
-	const transactionId = await ctx.supabaseAdmin
+	const { data, error } = await ctx.supabaseAdmin
 	.from("sale_transactions")
 	.select("transaction_id")
-	.eq("receipt_number", payload.receipt_number);
+	.eq("receipt_number", payload.receipt_number)
+	.maybeSingle();
+	if (error || !data) {
+		console.error(`FAILED to get 'transaction_id': ${error.message}`);
+		throw new Error(`FAILED to get 'transaction_id': ${error.message}`);
+	}
+	const transactionId = data.transaction_id;
 
 	for (const discount of payload.total_discounts) {
 		const { error: transactionDiscounts } = await ctx.supabaseAdmin
@@ -116,7 +122,7 @@ async function processSale(ctx, payload) {
 	//--------------------------------------------	
 	for (const item of payload.line_items) {
 
-		// upsert line_items
+		// upsert line_item
 		const { error: saleItem } = await ctx.supabaseAdmin
 		.from("sale_items")
 		.upsert({
@@ -137,6 +143,33 @@ async function processSale(ctx, payload) {
 		if (saleItem) {
 			console.error(`FAILED to upsert sale_item: ${item.item_name}`);
 			throw new Error(`FAILED to upsert sale_item: ${item.item_name}`);
+		}
+
+		// upsert sale_item_discounts
+		const { data, error } = await ctx.supabaseAdmin
+		.from("sale_items")
+		.select("sale_item_id")
+		.eq("transaction_id", transactionId)
+		.maybeSingle();
+
+		if (error || !data) {
+			console.log(`FAILED to get 'sale_item_id: ${error.message}`);
+			throw new Error(`FAILED to get 'sale_item_id: ${error.message}`);
+		}
+		const saleItemId = data.sale_item_id;
+
+		for (const discount of item.line_discounts) {
+			const { error: saleItemDiscount } = await ctx.supabaseAdmin
+			.from("sale_item_discounts")
+			.upsert({
+				sale_item_id: saleItemId,
+				discount_id: discount.id,
+				amount: discount.money_amount
+			}, { onConflict: "sale_item_id, discount_id" });
+			if (saleItemDiscount) {
+				console.error("FAILED to upsert to 'sale_item_discounts");
+				throw new Error("FAILED to upsert to 'sale_item_discounts");
+			}
 		}
 	}
 }
