@@ -41,6 +41,8 @@ export default {
 	}),
 };
 
+//—————————————————————————————————————————————————————————————————————————————
+
 async function processSale(ctx, payload) {
 	if (payload.cancelled_at) {
 		await cancelSale(ctx, payload); // make this function
@@ -67,7 +69,6 @@ async function processSale(ctx, payload) {
 		console.error(`FAILED to upsert transaction '${payload.receipt_number}'`);
 		throw new Error(`FAILED to upsert transaction '${payload.receipt_number}'`);
 	}
-
 
 	//--------------------------------------------
 	// iterate through transaction discounts
@@ -109,6 +110,33 @@ async function processSale(ctx, payload) {
 		if (transactionTaxes) {
 			console.error(`FAILED to upsert tax: ${tax.name}`);
 			throw new Error(`FAILED to upsert tax: ${tax.name}`);
+		}
+	}
+
+	//--------------------------------------------	
+	for (const item of payload.line_items) {
+
+		// upsert line_items
+		const { error: saleItem } = await ctx.supabaseAdmin
+		.from("sale_items")
+		.upsert({
+			transaction_id: transactionId,
+
+			loyverse_line_item_id: item.id,
+			variant_id: item.variant_id,
+			item_name: item.item_name,
+			sku_barcode: item.sku,
+
+			quantity: item.quantity,
+
+			unit_price: item.price,
+			gross_total: item.gross_total_money,
+			discount_amount: item.total_discount,
+			net_total: item.total_money
+		} { onConflict: "salte_item_id"});
+		if (saleItem) {
+			console.error(`FAILED to upsert sale_item: ${item.item_name}`);
+			throw new Error(`FAILED to upsert sale_item: ${item.item_name}`);
 		}
 	}
 }
