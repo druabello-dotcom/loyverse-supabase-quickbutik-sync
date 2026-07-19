@@ -9,7 +9,7 @@ import { withSupabase } from "@supabase/server";
 const MY_CUSTOM_WEBHOOK_SECRET = Deno.env.get("MY_CUSTOM_WEBHOOK_SECRET");
 
 function verifySignature(req) {
-	const url = new URL(req);
+	const url = new URL(req.url);
 	const providedSecret = url.searchParams.get("secret");
 	if (MY_CUSTOM_WEBHOOK_SECRET !== providedSecret) {
 		return false;
@@ -20,7 +20,7 @@ function verifySignature(req) {
 //—————————————————————————————————————————————————————————————————————————————
 
 export default {
-	fetch: withSupabase({ auth: "none "}, async (req, ctx) => {
+	fetch: withSupabase({ auth: "none" }, async (req, ctx) => {
 		const isValid = verifySignature(req);
 		if (!isValid) {
 			console.log("Unauthorized signature");
