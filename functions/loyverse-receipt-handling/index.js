@@ -29,10 +29,14 @@ export default {
 
 		try {
 			const payload = await req.json();
-			if (payload.receipt_type === "SALE") await processSale(ctx, payload);
-			else await processRefund(ctx, payload);
-				
+			console.log(`Receipt recieved: `, payload);
 			
+			for (const receipt of payload.receipts) {
+				if (receipt.receipt_type === "SALE") await processSale(ctx, receipt);
+			}
+
+			console.log("Successful");
+			return new Response("Successful");
 		} catch (error) {
 			console.error("API unsuccessful: ", error);
 			return new Response("API unsuccessful: ", error);
