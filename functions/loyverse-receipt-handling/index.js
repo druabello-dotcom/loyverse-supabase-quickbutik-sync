@@ -71,26 +71,44 @@ async function processSale(ctx, payload) {
 
 	//--------------------------------------------
 	// iterate through transaction discounts
-	for (const discount of payload.total_discounts) {
-		const transactionId = await ctx.supabaseAdmin
-		.from("sale_transactions")
-		.select("transaction_id")
-		.eq("receipt_number", payload.receipt_number);
+	const transactionId = await ctx.supabaseAdmin
+	.from("sale_transactions")
+	.select("transaction_id")
+	.eq("receipt_number", payload.receipt_number);
 
+	for (const discount of payload.total_discounts) {
 		const { error: transactionDiscounts } = await ctx.supabaseAdmin
 		.from("transaction_discounts")
 		.upsert({
 			transaction_id: transactionId,
 			loyverse_discount_id: discount.id,
 			type: discount.type,
+			name: discount.name,
 			percentage: discount.type === "VARIABLE_PERCENT" ? discount.percentage : null,
 			amount: discount.money_amount
-		}, { onConflict: "transaction_id" });
+		}, { onConflict: "discount_id" });
 		if (transactionDiscounts) {
 			console.error(`FAILED to upsert transaction discounts object`);
 			throw new Error(`FAILED to upsert transaction discounts object`);
 		}
 	}
 
-	
+	//--------------------------------------------	
+	// iterate through transaction taxes
+	for (const tax of payload.total_taxes) {
+		const { error: transactionTaxes } = await ctx.supabaseAdmin
+		.from("transaction_taxes")
+		.upsert({
+			transaction_id: transactionId,
+			loyverse_tax_id: tax.id,
+			type: tax.type,
+			name: tax.name,
+			rate: tax.rate,
+			amount: tax.money_amount
+		}, { onConflict: "tax_id"})
+		if (transactionTaxes) {
+			console.error(`FAILED to upsert tax: ${tax.name}`);
+			throw new Error(`FAILED to upsert tax: ${tax.name}`);
+		}
+	}
 }
