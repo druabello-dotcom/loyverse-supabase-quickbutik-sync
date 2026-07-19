@@ -43,7 +43,7 @@ export default {
 
 async function processSale(ctx, payload) {
 	if (payload.cancelled_at) {
-		await cancelSale(ctx, payload);
+		await cancelSale(ctx, payload); // make this function
 		return;
 	}
 
@@ -67,4 +67,30 @@ async function processSale(ctx, payload) {
 		console.error(`FAILED to upsert transaction '${payload.receipt_number}'`);
 		throw new Error(`FAILED to upsert transaction '${payload.receipt_number}'`);
 	}
+
+
+	//--------------------------------------------
+	// iterate through transaction discounts
+	for (const discount of payload.total_discounts) {
+		const transactionId = await ctx.supabaseAdmin
+		.from("sale_transactions")
+		.select("transaction_id")
+		.eq("receipt_number", payload.receipt_number);
+
+		const { error: transactionDiscounts } = await ctx.supabaseAdmin
+		.from("transaction_discounts")
+		.upsert({
+			transaction_id: transactionId,
+			loyverse_discount_id: discount.id,
+			type: discount.type,
+			percentage: discount.type === "VARIABLE_PERCENT" ? discount.percentage : null,
+			amount: discount.money_amount
+		}, { onConflict: "transaction_id" });
+		if (transactionDiscounts) {
+			console.error(`FAILED to upsert transaction discounts object`);
+			throw new Error(`FAILED to upsert transaction discounts object`);
+		}
+	}
+
+	
 }
